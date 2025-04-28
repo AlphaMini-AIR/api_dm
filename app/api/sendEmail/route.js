@@ -204,7 +204,7 @@ a{color:#2563eb;text-decoration:none}
     return json({ ok: true, html, stats: { doneCnt, todoCnt, approvedCnt, sessions } });
 
   } catch (e) {
-    console.error(e);
+    console.log(e);
     return json({ ok: false, error: e.message }, 500);
   }
 }

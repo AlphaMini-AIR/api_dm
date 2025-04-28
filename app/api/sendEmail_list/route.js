@@ -22,7 +22,7 @@ export async function GET() {
         const userIds = await PostUser.distinct('_id', { sendEmail: 1 });
         await Promise.all(
             userIds.map((id) =>
-                fetch('http://localhost:3001/api/sendEmail', {
+                fetch('https://api-dm-six.vercel.app/api/sendEmail', {
                     method: 'POST',
                     body: JSON.stringify({ id })
                 })
