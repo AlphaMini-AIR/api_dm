@@ -28,7 +28,7 @@ export async function GET() {
                 })
             )
         );
-
+ 
         return new Response(
             JSON.stringify({ status: 2, data: userIds }),
             { status: 200, headers: { 'Access-Control-Allow-Origin': '*' } },
