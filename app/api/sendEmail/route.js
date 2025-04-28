@@ -137,7 +137,7 @@ export async function POST(req) {
               <td>${s.link ? `<a href="${s.link}">Link</a>` : ''}</td><td>${s.cat}</td>
               <td><a href='https://dm.s4h.edu.vn/sub_task/${s.id}' target="_blank">chi tiết<a></td>
             </tr>`).join('')}
-        </tbody> 
+        </tbody>  
       </table>`;
 
     const projectHTML = projects.map((p, i) => `
