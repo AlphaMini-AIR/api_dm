@@ -29,17 +29,17 @@ export function OPTIONS() {
 export async function POST(req) {
   try {
     const { id } = await req.json();
-    if (!id) return json({ ok: false, message: 'Thiếu id' }, 400);
+    if (!id) return json({ x: 1, m: 'Thiếu id' }, 200);
 
     await connect();
 
     /* id -> ObjectId */
     let doerId;
     try { doerId = new Types.ObjectId(id); }
-    catch { return json({ ok: false, message: 'id không hợp lệ' }, 400); }
+    catch { return json({ x: 1, m: 'id không hợp lệ' }, 200); }
 
     const user = await PostUser.findById(doerId);
-    if (!user) return json({ ok: false, message: 'User không tồn tại' }, 404);
+    if (!user) return json({ x: 1, m: 'User không tồn tại' }, 200);
 
     /* khoảng ngày */
     const today = new Date();
@@ -194,7 +194,7 @@ a{color:#2563eb;text-decoration:none}
       service: 'gmail',
       auth: { user: 'contact@airobotic.edu.vn', pass: 'uowwajikcadyqmuk' }
     });
-    
+
     await transporter.sendMail({
       from: process.env.BASE_FROM || 'contact@airobotic.edu.vn',
       to: user.Email,
@@ -207,11 +207,10 @@ a{color:#2563eb;text-decoration:none}
       subject: reportTitle,
       html
     });
-    return json({ ok: true, html, stats: { doneCnt, todoCnt, approvedCnt, sessions } });
+    return json({ x: 2, m: "Báo cáo công việc đã được gửi qua email người dùng", data: [] });
 
   } catch (e) {
-    console.log(e);
-    return json({ ok: false, error: e.message }, 500);
+    return json({ x: 0, m: e.message, data: [] }, 500);
   }
 }
 
