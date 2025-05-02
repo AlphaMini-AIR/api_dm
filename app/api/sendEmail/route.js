@@ -166,7 +166,7 @@ export async function POST(req) {
         </tr>
       </table>`;
 
-    const reportTitle = `Báo cáo tháng ${today.getMonth() + 1}/${today.getFullYear()} (Tiến độ: ${sessions / 26 * 100}%)`;
+    const reportTitle = `Báo cáo tháng ${today.getMonth() + 1}/${today.getFullYear()} (Tiến độ: ${((sessions / 26) * 100).toFixed(2)}%)`;
     const html = `
 <!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -207,8 +207,7 @@ a{color:#2563eb;text-decoration:none}
       subject: reportTitle,
       html
     });
-    return json({ x: 2, m: "Báo cáo công việc đã được gửi qua email người dùng", data: user.Email });
-
+    return json({ x: 2, m: "Báo cáo công việc đã được gửi qua email người dùng", data: [] });
   } catch (e) {
     return json({ x: 0, m: e.message, data: [] }, 500);
   }
