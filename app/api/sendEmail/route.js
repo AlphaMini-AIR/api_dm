@@ -207,7 +207,7 @@ a{color:#2563eb;text-decoration:none}
       subject: reportTitle,
       html
     });
-    return json({ x: 2, m: "Báo cáo công việc đã được gửi qua email người dùng", data: [] });
+    return json({ x: 2, m: "Báo cáo công việc đã được gửi qua email người dùng", data: user.Email });
 
   } catch (e) {
     return json({ x: 0, m: e.message, data: [] }, 500);
