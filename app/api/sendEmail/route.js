@@ -166,7 +166,7 @@ export async function POST(req) {
         </tr>
       </table>`;
 
-    const reportTitle = `Báo cáo tháng ${today.getMonth() + 1}/${today.getFullYear()} (Tiến độ: ${sessions /  26 * 100 }%)`;
+    const reportTitle = `Báo cáo tháng ${today.getMonth() + 1}/${today.getFullYear()} (Tiến độ: ${sessions / 26 * 100}%)`;
     const html = `
 <!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -194,13 +194,19 @@ a{color:#2563eb;text-decoration:none}
       service: 'gmail',
       auth: { user: 'contact@airobotic.edu.vn', pass: 'uowwajikcadyqmuk' }
     });
+    
     await transporter.sendMail({
       from: process.env.BASE_FROM || 'contact@airobotic.edu.vn',
-      to: 'vam.nguyenhoang@gmail.com',
+      to: user.Email,
       subject: reportTitle,
       html
     });
-
+    await transporter.sendMail({
+      from: process.env.BASE_FROM || 'contact@airobotic.edu.vn',
+      to: 'nmson@lhu.edu.vn',
+      subject: reportTitle,
+      html
+    });
     return json({ ok: true, html, stats: { doneCnt, todoCnt, approvedCnt, sessions } });
 
   } catch (e) {
