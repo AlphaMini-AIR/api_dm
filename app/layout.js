@@ -10,7 +10,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body >
-        <p>Tên miền không hoạt động</p>
+        {children}
       </body>
     </html>
   );
