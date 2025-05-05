@@ -36,7 +36,7 @@ export async function POST(request) {
             return new Response(
                 JSON.stringify({
                     air: 1,
-                }),
+                }), 
                 { status: 200, headers: { 'Content-Type': 'application/json' } }
             );
 
