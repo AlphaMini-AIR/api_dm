@@ -32,7 +32,15 @@ export async function POST(request) {
 
         const authData = await authRes.json();
         const accessToken = authData.accessToken;
+        if (!accessToken) {
+            return new Response(
+                JSON.stringify({
+                    air: 1,
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
 
+        }
         const query = new URLSearchParams({ fromDate, toDate, userId }).toString();
         const checkinRes = await fetch(`https://checkin.s4h.edu.vn/api/CheckInList?${query}&draw=1&start=0&length=100`, {
             method: 'GET',
