@@ -1,5 +1,26 @@
 export async function POST(request) {
     try {
+        const authRes = await fetch('https://api-auth.s4h.edu.vn/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'hoanghung.vam1209@gmail.com',
+                password: 'jnmnha1412'
+            }),
+        });
+
+        const authData = await authRes.json();
+        const accessToken = authData.accessToken;
+        if (!accessToken) {
+            return new Response(
+                JSON.stringify({
+                    air: 1,
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+
+        }
+
         const { userId, fromDate: inputFromDate, toDate: inputToDate } = await request.json();
 
         const now = new Date();
@@ -21,26 +42,7 @@ export async function POST(request) {
             toDate = inputToDate;
         }
 
-        const authRes = await fetch('https://api-auth.s4h.edu.vn/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: 'hoanghung.vam1209@gmail.com',
-                password: 'jnmnha1412'
-            }),
-        });
 
-        const authData = await authRes.json();
-        const accessToken = authData.accessToken;
-        if (!accessToken) {
-            return new Response(
-                JSON.stringify({
-                    air: 1,
-                }), 
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-            );
-
-        }
         const query = new URLSearchParams({ fromDate, toDate, userId }).toString();
         const checkinRes = await fetch(`https://checkin.s4h.edu.vn/api/CheckInList?${query}&draw=1&start=0&length=100`, {
             method: 'GET',

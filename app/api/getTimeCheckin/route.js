@@ -1,134 +1,103 @@
-import { connectToDatabase } from '@/data/connectPass';
-import Checkin from '@/data/models/checkin';
-import { NextResponse } from 'next/server';
+import { connectDB } from '@/data/connect';
+import { getCheckinModel } from '@/data/models/checkin';
+import { json, OPTIONS } from '@/lib/cors.js';
+
+export { OPTIONS };
 
 export async function POST(req) {
     try {
-        const headers = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
-
-        await connectToDatabase();
-
         const { userId, dateStart, dateEnd } = await req.json();
-        if (!userId) {
-            return NextResponse.json({ error: 'Thiếu userId' }, { status: 400, headers });
+        console.log(userId);
+
+        if (!userId) return json({ error: 'Thiếu userId' }, { status: 400 });
+
+        const conn = await connectDB(process.env.DATA_CHECKIN,
+            { dbName: 'checkin_service' }
+        );
+        const Checkin = getCheckinModel(conn);
+
+        const query = { userId };
+        const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+
+        if (dateStart && dateEnd && regex.test(dateStart) && regex.test(dateEnd)) {
+            const [d1, m1, y1] = dateStart.split('/');
+            const [d2, m2, y2] = dateEnd.split('/');
+            query.checkedInAt = {
+                $gte: new Date(`${y1}-${m1}-${d1}T00:00:00Z`),
+                $lte: new Date(`${y2}-${m2}-${d2}T23:59:59Z`),
+            };
         }
 
-        const allCheckins = await Checkin.find({ userId }).sort({ createdAt: -1 });
+        const raw = await Checkin.find(query)
+            .where('shift').in(['morning', 'afternoon', 'fulltime'])
+            .where('checkedOutAt').ne(null)
+            .sort({ createdAt: -1 })
+            .lean();
 
-        let checkins = allCheckins;
+        const MS = 60_000;
+        let totalMins = 0;
+        let complete = 0;
+        let incomp = 0;
 
-        const regexDate = /^\d{2}\/\d{2}\/\d{4}$/;
-        if (dateStart && dateEnd && regexDate.test(dateStart) && regexDate.test(dateEnd)) {
-            const [dStart, mStart, yStart] = dateStart.split('/');
-            const [dEnd, mEnd, yEnd] = dateEnd.split('/');
-            const startDate = new Date(`${yStart}-${mStart}-${dStart}`);
-            const endDate = new Date(`${yEnd}-${mEnd}-${dEnd}`);
+        const result = raw
+            .map(r => {
+                const { shift, checkedInAt, checkedOutAt, date } = r;
+                if (!shift || !date) return null;
 
-            checkins = checkins.filter(item => {
-                if (!item.date) return false;
-                const [d, m, y] = item.date.split('/');
-                const itemDate = new Date(`${y}-${m}-${d}`);
-                return itemDate >= startDate && itemDate <= endDate;
-            });
-        }
+                const [dd, mm, yyyy] = date.split('/');
+                const base = new Date(`${yyyy}-${mm}-${dd}T00:00:00Z`);
 
-        checkins = checkins.filter(item => item.shift && item.checkedInAt && item.checkedOutAt);
+                const SLOT = {
+                    morning: { start: 30, end: 270 },
+                    afternoon: { start: 360, end: 600 },
+                    fulltime: { start: 30, end: 600 },
+                }[shift];
 
-        let totalHours = 0;
-        let completeSessions = 0;
-        let incompleteSessions = 0;
+                const inT = new Date(checkedInAt);
+                const outT = new Date(checkedOutAt);
+                let work = Math.floor((outT - inT) / MS);
+                let ok = false;
 
-        for (const record of checkins) {
-            const { checkedInAt, checkedOutAt, shift, date } = record;
-            const [dd, mm, yyyy] = date.split('/');
-            const workDate = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+                if (shift === 'fulltime') {
+                    const lateCut = new Date(base.getTime() + SLOT.start * MS);
+                    const earlyCut = new Date(base.getTime() + SLOT.end * MS);
 
-            const mStart = new Date(workDate); mStart.setUTCHours(0, 30);
-            const mEnd = new Date(workDate); mEnd.setUTCHours(4, 30);
+                    if (inT < lateCut) work += Math.floor((lateCut - inT) / MS);
+                    if (outT > earlyCut) work += Math.floor((outT - earlyCut) / MS);
 
-            const aStart = new Date(workDate); aStart.setUTCHours(6, 0);
-            const aEnd = new Date(workDate); aEnd.setUTCHours(10, 0);
-
-            const fullStart = new Date(workDate); fullStart.setUTCHours(0, 30);
-            const fullEnd = new Date(workDate); fullEnd.setUTCHours(10, 0);
-            const lateCutoff = new Date(workDate); lateCutoff.setUTCHours(0, 30);
-            const earlyCutoff = new Date(workDate); earlyCutoff.setUTCHours(10, 0);
-
-            const checkIn = new Date(checkedInAt);
-            const checkOut = new Date(checkedOutAt);
-
-            let workMinutes = 0;
-            let isCompleted = false;
-
-            if (shift === 'morning') {
-                workMinutes = Math.floor((checkOut - checkIn) / 60000);
-                isCompleted = checkIn <= mStart && checkOut >= mEnd;
-            } else if (shift === 'afternoon') {
-                workMinutes = Math.floor((checkOut - checkIn) / 60000);
-                isCompleted = checkIn <= aStart && checkOut >= aEnd;
-            } else if (shift === 'fulltime') {
-                workMinutes = 8 * 60;
-
-                if (checkIn < fullStart) {
-                    workMinutes += Math.floor((fullStart - checkIn) / 60000);
+                    if (inT > lateCut) {
+                        const late = Math.floor((inT - lateCut) / MS);
+                        if (late > 5) work -= late;
+                    }
+                    if (outT < earlyCut) {
+                        const early = Math.floor((earlyCut - outT) / MS);
+                        if (early > 5) work -= early;
+                    }
+                    work = Math.max(work, 0);
+                    ok = work >= 8 * 60;
+                } else {
+                    const winStart = new Date(base.getTime() + SLOT.start * MS);
+                    const winEnd = new Date(base.getTime() + SLOT.end * MS);
+                    ok = inT <= winStart && outT >= winEnd;
                 }
 
-                if (checkOut > fullEnd) {
-                    workMinutes += Math.floor((checkOut - fullEnd) / 60000);
-                }
+                totalMins += work;
+                ok ? complete++ : incomp++;
 
-                if (checkIn > lateCutoff) {
-                    const late = Math.floor((checkIn - lateCutoff) / 60000);
-                    if (late > 5) workMinutes -= late;
-                }
+                return { ...r, workHours: Number((work / 60).toFixed(2)), isCompleted: ok };
+            })
+            .filter(Boolean);
 
-                if (checkOut < earlyCutoff) {
-                    const early = Math.floor((earlyCutoff - checkOut) / 60000);
-                    if (early > 5) workMinutes -= early;
-                }
-
-                workMinutes = Math.max(workMinutes, 0);
-                isCompleted = workMinutes >= 8 * 60;
-            }
-
-            const workHours = workMinutes / 60;
-            totalHours += workHours;
-
-            if (isCompleted) completeSessions++;
-            else incompleteSessions++;
-
-            record.workHours = Number(workHours.toFixed(2));
-            record.isCompleted = isCompleted;
-        }
-
-        return NextResponse.json({
-            totalHours: Number(totalHours.toFixed(2)),
-            completeSessions,
-            incompleteSessions,
-            checkins,
-            ds: checkins.length
-        }, {
-            status: 200,
-            headers
+        return json({
+            totalHours: Number((totalMins / 60).toFixed(2)),
+            completeSessions: complete,
+            incompleteSessions: incomp,
+            checkins: result,
+            ds: result.length,
         });
 
-    } catch (error) {
-        console.error('❌ Lỗi khi lấy dữ liệu checkin:', error);
-        return NextResponse.json({ error: 'Lỗi server' }, { status: 500 });
+    } catch (err) {
+        console.error('❌ Lỗi check‑in report:', err);
+        return json({ error: 'Lỗi server' }, { status: 500 });
     }
-}
-
-export function OPTIONS() {
-    return new Response(null, {
-        status: 204,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        },
-    });
 }
